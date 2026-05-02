@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>2-DOF Robotic Arm — Inverse Kinematics Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600&family=Barlow+Condensed:wght@500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:       #0a0a0a;
+    --panel:    #111111;
+    --border:   #222222;
+    --accent:   #e8e8e8;
+    --dim:      #555555;
+    --reach:    rgba(255,255,255,0.04);
+    --live:     #ffffff;
+    --warn:     #cc4444;
+    --ok:       #44cc88;
+    --label:    #888888;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--accent);
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    overflow: hidden;
+  }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    grid-template-rows: 48px 1fr;
+    height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .header-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--live);
+  }
+  .header-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
+    display: inline-block;
+    margin-right: 8px;
+    box-shadow: 0 0 6px var(--ok);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ── CANVAS AREA ── */
+  .canvas-wrap {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    cursor: crosshair;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .canvas-label {
+    position: absolute;
+    top: 16px; left: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    pointer-events: none;
+  }
+  .crosshair-label {
+    position: absolute;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(10px, -14px);
+  }
+
+  /* ── SIDE PANEL ── */
+  .panel {
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 20px;
+  }
+  .panel-section:last-child { border-bottom: none; }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin-bottom: 14px;
+  }
+
+  /* ── READOUT ROWS ── */
+  .readout {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 11px;
+  }
+  .readout:last-child { margin-bottom: 0; }
+  .readout-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--label);
+    letter-spacing: 0.06em;
+  }
+  .readout-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    color: var(--live);
+    letter-spacing: 0.04em;
+    min-width: 80px;
+    text-align: right;
+  }
+  .readout-value.warn { color: var(--warn); }
+  .readout-value.ok   { color: var(--ok);   }
+  .readout-value.dim  { color: var(--dim);  }
+
+  /* ── ANGLE VISUAL ── */
+  .angle-bar-wrap {
+    margin: 8px 0 14px;
+  }
+  .angle-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+  }
+  .angle-bar-row:last-child { margin-bottom: 0; }
+  .angle-bar-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--label);
+    width: 24px;
+    flex-shrink: 0;
+  }
+  .angle-bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .angle-bar-fill {
+    height: 100%;
+    background: var(--live);
+    border-radius: 2px;
+    transition: width 0.05s linear;
+  }
+  .angle-bar-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    width: 38px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── CONTROLS ── */
+  .ctrl-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .ctrl-row:last-child { margin-bottom: 0; }
+
+  .btn {
+    flex: 1;
+    padding: 8px 10px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--label);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .btn:hover {
+    border-color: var(--dim);
+    color: var(--live);
+  }
+  .btn.active {
+    border-color: var(--live);
+    color: var(--live);
+    background: rgba(255,255,255,0.06);
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .slider-row label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--label);
+    white-space: nowrap;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--live);
+    cursor: pointer;
+  }
+
+  /* ── EQUATION BOX ── */
+  .eq-box {
+    background: #0d0d0d;
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    margin-top: 0;
+  }
+  .eq-line {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    line-height: 1.8;
+    letter-spacing: 0.03em;
+  }
+  .eq-line span { color: var(--live); }
+
+  /* ── WAYPOINT LIST ── */
+  .wp-list { display: flex; flex-direction: column; gap: 6px; }
+  .wp-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--label);
+  }
+  .wp-item:hover { border-color: var(--dim); color: var(--live); }
+  .wp-item.active { border-color: var(--live); color: var(--live); background: rgba(255,255,255,0.05); }
+  .wp-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--dim);
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .wp-item.active .wp-dot { background: var(--live); box-shadow: 0 0 5px var(--live); }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <span class="status-dot" id="statusDot"></span>
+      <span class="header-title">2-DOF Robotic Arm — Inverse Kinematics</span>
+    </div>
+    <div class="header-sub">L1 = 120 mm &nbsp;|&nbsp; L2 = 90 mm &nbsp;|&nbsp; ELBOW-UP SOLUTION</div>
+  </header>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <canvas id="armCanvas"></canvas>
+    <div class="canvas-label">WORKSPACE PLANE — click or drag to set target</div>
+    <div class="crosshair-label" id="crosshairLabel"></div>
+  </div>
+
+  <!-- SIDE PANEL -->
+  <div class="panel">
+
+    <!-- LIVE DATA -->
+    <div class="panel-section">
+      <div class="section-title">Live Readout</div>
+
+      <div class="readout">
+        <span class="readout-label">target x</span>
+        <span class="readout-value" id="valX">—</span>
+      </div>
+      <div class="readout">
+        <span class="readout-label">target y</span>
+        <span class="readout-value" id="valY">—</span>
+      </div>
+      <div class="readout">
+        <span class="readout-label">distance</span>
+        <span class="readout-value" id="valDist">—</span>
+      </div>
+      <div class="readout">
+        <span class="readout-label">status</span>
+        <span class="readout-value ok" id="valStatus">READY</span>
+      </div>
+
+      <div class="angle-bar-wrap" style="margin-top:14px;">
+        <div class="angle-bar-row">
+          <span class="angle-bar-label">T1</span>
+          <div class="angle-bar-track"><div class="angle-bar-fill" id="bar1" style="width:50%"></div></div>
+          <span class="angle-bar-val" id="valT1">90°</span>
+        </div>
+        <div class="angle-bar-row">
+          <span class="angle-bar-label">T2</span>
+          <div class="angle-bar-track"><div class="angle-bar-fill" id="bar2" style="width:50%"></div></div>
+          <span class="angle-bar-val" id="valT2">90°</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE EQUATIONS -->
+    <div class="panel-section">
+      <div class="section-title">IK Equations — Live</div>
+      <div class="eq-box">
+        <div class="eq-line">cos(T2) = <span id="eqCos">—</span></div>
+        <div class="eq-line">T2 = atan2(<span id="eqSin">—</span>, <span id="eqCosVal">—</span>)</div>
+        <div class="eq-line">T1 = atan2(y,x) - atan2(k2,k1)</div>
+        <div class="eq-line" style="margin-top:6px;">k1 = <span id="eqK1">—</span></div>
+        <div class="eq-line">k2 = <span id="eqK2">—</span></div>
+      </div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="panel-section">
+      <div class="section-title">Mode</div>
+      <div class="ctrl-row">
+        <button class="btn active" id="btnManual" onclick="setMode('manual')">Manual</button>
+        <button class="btn" id="btnAuto" onclick="setMode('auto')">Auto</button>
+      </div>
+      <div class="ctrl-row" style="margin-top:2px;">
+        <button class="btn" id="btnElbow" onclick="toggleElbow()">Elbow: UP</button>
+        <button class="btn" onclick="resetView()">Reset</button>
+      </div>
+      <div class="slider-row">
+        <label>Speed</label>
+        <input type="range" id="speedSlider" min="1" max="10" value="4" />
+      </div>
+    </div>
+
+    <!-- WAYPOINTS -->
+    <div class="panel-section">
+      <div class="section-title">Waypoints</div>
+      <div class="wp-list" id="wpList"></div>
+    </div>
+
+  </div><!-- /panel -->
+</div><!-- /app -->
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────
+const L1 = 120;   // mm — link 1 length
+const L2 = 90;    // mm — link 2 length
+const SCALE = 2.0; // px per mm
+
+const WAYPOINTS = [
+  { label: 'A', x: 150, y:  80 },
+  { label: 'B', x:  80, y: 150 },
+  { label: 'C', x: 180, y:   0 },
+  { label: 'D', x: 100, y: 110 },
+  { label: 'E', x:  60, y:  60 },
+  { label: 'F', x: 130, y: -60 },
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────
+let state = {
+  mode: 'manual',         // 'manual' | 'auto'
+  elbowUp: true,
+  target: { x: 150, y: 80 },
+  current: { theta1: 0, theta2: 0 },   // animated current angles
+  solved: { theta1: 0, theta2: 0, reachable: true },
+  wpIndex: 0,
+  autoT: 0,               // lerp progress 0–1
+  autoFrom: { theta1: 0, theta2: 0 },
+  autoFromTarget: { x: 150, y: 80 },
+  autoToTarget: { x: 80, y: 150 },
+  dragging: false,
+};
+
+// ── DOM ───────────────────────────────────────────────────────────────
+const canvas = document.getElementById('armCanvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('canvasWrap');
+const clabel = document.getElementById('crosshairLabel');
+
+// ── RESIZE ────────────────────────────────────────────────────────────
+let OX, OY;  // canvas origin = shoulder joint position in px
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+  OX = w * 0.42;
+  OY = h * 0.64;
+}
+window.addEventListener('resize', () => { resize(); });
+resize();
+
+// ── IK SOLVER ─────────────────────────────────────────────────────────
+function solveIK(x, y, elbowUp) {
+  const distSq = x*x + y*y;
+  const dist   = Math.sqrt(distSq);
+  const maxR   = L1 + L2;
+  const minR   = Math.abs(L1 - L2);
+
+  if (dist > maxR * 0.999 || dist < minR * 1.001) {
+    return { reachable: false, theta1: 0, theta2: 0,
+             cosT2: null, sinT2: null, k1: null, k2: null };
+  }
+
+  let cosT2 = (distSq - L1*L1 - L2*L2) / (2 * L1 * L2);
+  cosT2 = Math.max(-1, Math.min(1, cosT2));
+
+  const sinT2  = elbowUp ? Math.sqrt(1 - cosT2*cosT2) : -Math.sqrt(1 - cosT2*cosT2);
+  const theta2 = Math.atan2(sinT2, cosT2);
+
+  const k1 = L1 + L2 * cosT2;
+  const k2 = L2 * sinT2;
+  const theta1 = Math.atan2(y, x) - Math.atan2(k2, k1);
+
+  return {
+    reachable: true,
+    theta1, theta2,
+    cosT2, sinT2, k1, k2,
+  };
+}
+
+// ── DRAWING ───────────────────────────────────────────────────────────
+const ARM_COL   = '#0f0f0f';
+const STROKE    = '#ffffff';
+const JOINT_RAD = 22;
+const LINK1_W   = 32;
+const LINK2_W   = 24;
+const LINK1_L   = L1 * SCALE;
+const LINK2_L   = L2 * SCALE;
+
+function drawGrid(w, h) {
+  ctx.save();
+  const spacing = 40;
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = OX % spacing; x < w; x += spacing) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+  }
+  for (let y = OY % spacing; y < h; y += spacing) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+  }
+
+  // axes through origin
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath(); ctx.moveTo(0, OY); ctx.lineTo(w, OY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(OX, 0); ctx.lineTo(OX, h); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // axis labels
+  ctx.font = '10px Share Tech Mono';
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.fillText('+x', w - 28, OY - 8);
+  ctx.fillText('+y', OX + 8, 14);
+
+  ctx.restore();
+}
+
+function drawWorkspaceCircle() {
+  ctx.save();
+  const maxPx = (L1 + L2) * SCALE;
+  const minPx = Math.abs(L1 - L2) * SCALE;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 6]);
+
+  ctx.beginPath();
+  ctx.arc(OX, OY, maxPx, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(OX, OY, minPx, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.font = '9px Share Tech Mono';
+  ctx.fillText('max reach ' + (L1+L2) + 'mm', OX + maxPx + 4, OY - 4);
+  ctx.restore();
+}
+
+function drawBase() {
+  ctx.save();
+  ctx.translate(OX, OY);
+
+  // mounting pedestal
+  const bw = 80, bh = 18;
+  ctx.fillStyle = ARM_COL;
+  ctx.strokeStyle = STROKE;
+  ctx.lineWidth = 2;
+  roundRect(ctx, -bw/2, 4, bw, bh, 4);
+  ctx.fill(); ctx.stroke();
+
+  // shoulder plate
+  const pw = 50, ph = 10;
+  roundRect(ctx, -pw/2, -ph, pw, ph, 3);
+  ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawLink(length, width, label) {
+  // draw a tapered link shape centred on x-axis from 0 to length
+  const taper = 6;
+  ctx.beginPath();
+  ctx.moveTo(0, -width/2);
+  ctx.lineTo(length - taper, -(width/2 - taper/2));
+  ctx.lineTo(length, -(width/2 - taper));
+  ctx.lineTo(length, width/2 - taper);
+  ctx.lineTo(length - taper, width/2 - taper/2);
+  ctx.lineTo(0, width/2);
+  ctx.closePath();
+
+  ctx.fillStyle = ARM_COL;
+  ctx.fill();
+  ctx.strokeStyle = STROKE;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // centre line
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 6]);
+  ctx.beginPath();
+  ctx.moveTo(8, 0);
+  ctx.lineTo(length - 8, 0);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawJoint(radius, strokeW) {
+  // outer ring
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fill();
+  ctx.strokeStyle = STROKE;
+  ctx.lineWidth = strokeW;
+  ctx.stroke();
+
+  // inner detail
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.4, 0, Math.PI * 2);
+  ctx.fillStyle = ARM_COL;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // tick marks on joint
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const r1 = radius * 0.62;
+    const r2 = radius * 0.75;
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a)*r1, Math.sin(a)*r1);
+    ctx.lineTo(Math.cos(a)*r2, Math.sin(a)*r2);
+    ctx.stroke();
+  }
+}
+
+function drawGripper() {
+  const gw = 12, gh = 18, gap = 8;
+
+  // left jaw
+  ctx.fillStyle = ARM_COL;
+  ctx.strokeStyle = STROKE;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -gap/2);
+  ctx.lineTo(gw, -gap/2 - 6);
+  ctx.lineTo(gw + 8, -gap/2 - 6);
+  ctx.lineTo(gw + 8, -gap/2 - 1);
+  ctx.lineTo(gw, -gap/2 - 1);
+  ctx.lineTo(0, -gap/2 + 2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // right jaw
+  ctx.beginPath();
+  ctx.moveTo(0, gap/2);
+  ctx.lineTo(gw, gap/2 + 6);
+  ctx.lineTo(gw + 8, gap/2 + 6);
+  ctx.lineTo(gw + 8, gap/2 + 1);
+  ctx.lineTo(gw, gap/2 + 1);
+  ctx.lineTo(0, gap/2 - 2);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // wrist block
+  roundRect(ctx, -10, -gap/2 - 2, 10, gap + 4, 2);
+  ctx.fill(); ctx.stroke();
+}
+
+function drawAngleArc(radius, startAngle, endAngle, color, label) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, -startAngle, -endAngle, endAngle > startAngle);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // label at midpoint
+  const mid = (startAngle + endAngle) / 2;
+  const lx = Math.cos(-mid) * (radius + 12);
+  const ly = Math.sin(-mid) * (radius + 12);
+  ctx.font = '9px Share Tech Mono';
+  ctx.fillStyle = color;
+  ctx.fillText(label, lx - 14, ly + 4);
+  ctx.restore();
+}
+
+function drawTarget(tx, ty, reachable) {
+  const px = OX + tx * SCALE;
+  const py = OY - ty * SCALE;
+
+  ctx.save();
+  ctx.translate(px, py);
+
+  const col = reachable ? 'rgba(255,255,255,0.8)' : 'rgba(200,60,60,0.8)';
+
+  // crosshair
+  ctx.strokeStyle = col;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-16, 0); ctx.lineTo(16, 0);
+  ctx.moveTo(0, -16); ctx.lineTo(0, 16);
+  ctx.stroke();
+
+  // outer circle
+  ctx.beginPath();
+  ctx.arc(0, 0, 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // inner dot
+  ctx.beginPath();
+  ctx.arc(0, 0, 2, 0, Math.PI * 2);
+  ctx.fillStyle = col;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawTraceLine(t1, t2) {
+  // faint line from shoulder to elbow to end-effector
+  const ex1 = Math.cos(t1) * LINK1_L;
+  const ey1 = -Math.sin(t1) * LINK1_L;
+  const ex2 = ex1 + Math.cos(t1 + t2) * LINK2_L;
+  const ey2 = ey1 - Math.sin(t1 + t2) * LINK2_L;
+
+  ctx.save();
+  ctx.translate(OX, OY);
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(ex1, ey1);
+  ctx.lineTo(ex2, ey2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawWaypointDots() {
+  WAYPOINTS.forEach((wp, i) => {
+    const px = OX + wp.x * SCALE;
+    const py = OY - wp.y * SCALE;
+    ctx.save();
+    ctx.translate(px, py);
+    const isActive = (state.mode === 'auto' && i === state.wpIndex);
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255,255,255,0.2)';
+    ctx.fill();
+    ctx.font = '9px Share Tech Mono';
+    ctx.fillStyle = isActive ? '#ffffff' : 'rgba(255,255,255,0.3)';
+    ctx.fillText(wp.label, 7, 4);
+    ctx.restore();
+  });
+}
+
+function drawArm(theta1, theta2) {
+  ctx.save();
+  ctx.translate(OX, OY);
+
+  // trace reference lines (faint skeleton)
+  drawTraceLine(theta1, theta2);
+
+  // ── BASE
+  drawBase();
+
+  // ── LINK 1
+  ctx.save();
+  ctx.rotate(-theta1);
+  drawLink(LINK1_L, LINK1_W);
+
+  // angle arc at shoulder
+  drawAngleArc(38, 0, theta1, 'rgba(255,255,255,0.4)',
+    Math.round(theta1 * 180 / Math.PI) + '\u00b0');
+
+  // ── ELBOW JOINT
+  ctx.translate(LINK1_L, 0);
+  drawJoint(JOINT_RAD - 4, 2.5);
+
+  // ── LINK 2
+  ctx.save();
+  ctx.rotate(-theta2);
+  drawLink(LINK2_L, LINK2_W);
+
+  // angle arc at elbow
+  drawAngleArc(28, 0, theta2, 'rgba(255,255,255,0.3)',
+    Math.round(theta2 * 180 / Math.PI) + '\u00b0');
+
+  // ── END EFFECTOR (gripper)
+  ctx.translate(LINK2_L, 0);
+  drawJoint(JOINT_RAD - 10, 2);
+  drawGripper();
+
+  ctx.restore(); // unrotate link2
+  ctx.restore(); // unrotate link1 (back to joint1)
+
+  // ── SHOULDER JOINT (drawn last so it's on top)
+  drawJoint(JOINT_RAD, 3);
+
+  ctx.restore(); // canvas origin
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────────────────
+function render() {
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+
+  ctx.clearRect(0, 0, w, h);
+
+  drawGrid(w, h);
+  drawWorkspaceCircle();
+  drawWaypointDots();
+  drawTarget(state.target.x, state.target.y, state.solved.reachable);
+  drawArm(state.current.theta1, state.current.theta2);
+}
+
+// ── ANIMATION LOOP ────────────────────────────────────────────────────
+const LERP_SPEED = 0.08;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function angleLerp(a, b, t) {
+  let diff = b - a;
+  while (diff > Math.PI)  diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return a + diff * t;
+}
+
+let lastTime = 0;
+let autoAccum = 0;
+
+function tick(ts) {
+  const dt = Math.min(ts - lastTime, 50);
+  lastTime = ts;
+
+  // ── AUTO MODE: advance through waypoints
+  if (state.mode === 'auto') {
+    const speed = parseFloat(document.getElementById('speedSlider').value);
+    autoAccum += dt * 0.0005 * speed;
+
+    if (autoAccum >= 1) {
+      autoAccum = 0;
+      state.autoFrom = { ...state.solved };
+      state.wpIndex = (state.wpIndex + 1) % WAYPOINTS.length;
+      state.target = { ...WAYPOINTS[state.wpIndex] };
+      updateWpUI();
+    }
+
+    const t = easeInOut(Math.min(autoAccum, 1));
+    const prevWp = WAYPOINTS[(state.wpIndex - 1 + WAYPOINTS.length) % WAYPOINTS.length];
+    const curWp  = WAYPOINTS[state.wpIndex];
+    state.target = {
+      x: lerp(prevWp.x, curWp.x, t),
+      y: lerp(prevWp.y, curWp.y, t),
+    };
+  }
+
+  // ── SOLVE IK for current target
+  const sol = solveIK(state.target.x, state.target.y, state.elbowUp);
+  state.solved = sol;
+
+  // ── LERP current angles toward solved
+  if (sol.reachable) {
+    state.current.theta1 = angleLerp(state.current.theta1, sol.theta1, LERP_SPEED * 2);
+    state.current.theta2 = angleLerp(state.current.theta2, sol.theta2, LERP_SPEED * 2);
+  }
+
+  // ── UPDATE PANEL
+  updatePanel(sol);
+
+  render();
+  requestAnimationFrame(tick);
+}
+
+function easeInOut(t) {
+  return t < 0.5 ? 2*t*t : -1+(4-2*t)*t;
+}
+
+// ── PANEL UPDATE ──────────────────────────────────────────────────────
+function updatePanel(sol) {
+  const tx = state.target.x.toFixed(1);
+  const ty = state.target.y.toFixed(1);
+  const d  = Math.sqrt(state.target.x**2 + state.target.y**2).toFixed(1);
+
+  document.getElementById('valX').textContent    = tx + ' mm';
+  document.getElementById('valY').textContent    = ty + ' mm';
+  document.getElementById('valDist').textContent = d  + ' mm';
+
+  const statusEl = document.getElementById('valStatus');
+  if (sol.reachable) {
+    statusEl.textContent = 'REACHABLE';
+    statusEl.className   = 'readout-value ok';
+    document.getElementById('statusDot').style.background = 'var(--ok)';
+    document.getElementById('statusDot').style.boxShadow  = '0 0 6px var(--ok)';
+  } else {
+    statusEl.textContent = 'OUT OF RANGE';
+    statusEl.className   = 'readout-value warn';
+    document.getElementById('statusDot').style.background = 'var(--warn)';
+    document.getElementById('statusDot').style.boxShadow  = '0 0 6px var(--warn)';
+  }
+
+  if (sol.reachable) {
+    const t1d = (sol.theta1 * 180 / Math.PI).toFixed(1);
+    const t2d = (sol.theta2 * 180 / Math.PI).toFixed(1);
+    document.getElementById('valT1').textContent = t1d + '\u00b0';
+    document.getElementById('valT2').textContent = t2d + '\u00b0';
+    document.getElementById('bar1').style.width = ((sol.theta1 / Math.PI + 0.5) * 100).toFixed(1) + '%';
+    document.getElementById('bar2').style.width = ((sol.theta2 / Math.PI) * 100).toFixed(1) + '%';
+
+    document.getElementById('eqCos').textContent    = sol.cosT2.toFixed(4);
+    document.getElementById('eqSin').textContent    = sol.sinT2.toFixed(4);
+    document.getElementById('eqCosVal').textContent = sol.cosT2.toFixed(4);
+    document.getElementById('eqK1').textContent     = sol.k1.toFixed(2);
+    document.getElementById('eqK2').textContent     = sol.k2.toFixed(2);
+  } else {
+    ['valT1','valT2','eqCos','eqSin','eqCosVal','eqK1','eqK2'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('bar1').style.width = '0%';
+    document.getElementById('bar2').style.width = '0%';
+  }
+
+  // crosshair label
+  const px = OX + state.target.x * SCALE;
+  const py = OY - state.target.y * SCALE;
+  clabel.style.left = px + 'px';
+  clabel.style.top  = py + 'px';
+  clabel.textContent = `(${tx}, ${ty})`;
+}
+
+// ── WAYPOINT UI ───────────────────────────────────────────────────────
+function buildWpUI() {
+  const list = document.getElementById('wpList');
+  list.innerHTML = '';
+  WAYPOINTS.forEach((wp, i) => {
+    const el = document.createElement('div');
+    el.className = 'wp-item' + (i === state.wpIndex ? ' active' : '');
+    el.id = 'wp-' + i;
+    el.innerHTML = `<div class="wp-dot"></div><span>${wp.label} &nbsp; x=${wp.x} &nbsp; y=${wp.y}</span>`;
+    el.onclick = () => {
+      state.target = { x: wp.x, y: wp.y };
+      state.wpIndex = i;
+      if (state.mode === 'auto') { autoAccum = 0; }
+      updateWpUI();
+    };
+    list.appendChild(el);
+  });
+}
+
+function updateWpUI() {
+  WAYPOINTS.forEach((_, i) => {
+    const el = document.getElementById('wp-' + i);
+    if (el) el.className = 'wp-item' + (i === state.wpIndex ? ' active' : '');
+  });
+}
+
+// ── INPUT ─────────────────────────────────────────────────────────────
+function canvasToWorld(ex, ey) {
+  const rect = canvas.getBoundingClientRect();
+  const cx = ex - rect.left;
+  const cy = ey - rect.top;
+  return {
+    x: (cx - OX) / SCALE,
+    y: -(cy - OY) / SCALE,
+  };
+}
+
+wrap.addEventListener('mousedown', e => {
+  state.dragging = true;
+  const w = canvasToWorld(e.clientX, e.clientY);
+  state.target = w;
+  if (state.mode === 'auto') setMode('manual');
+});
+wrap.addEventListener('mousemove', e => {
+  if (!state.dragging) return;
+  state.target = canvasToWorld(e.clientX, e.clientY);
+});
+wrap.addEventListener('mouseup', () => { state.dragging = false; });
+wrap.addEventListener('mouseleave', () => { state.dragging = false; });
+
+wrap.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  state.target = canvasToWorld(t.clientX, t.clientY);
+  if (state.mode === 'auto') setMode('manual');
+}, { passive: false });
+wrap.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  state.target = canvasToWorld(t.clientX, t.clientY);
+}, { passive: false });
+
+// ── MODE CONTROLS ─────────────────────────────────────────────────────
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('btnManual').classList.toggle('active', m === 'manual');
+  document.getElementById('btnAuto').classList.toggle('active', m === 'auto');
+  if (m === 'auto') {
+    autoAccum = 0;
+    state.target = { ...WAYPOINTS[state.wpIndex] };
+  }
+}
+
+function toggleElbow() {
+  state.elbowUp = !state.elbowUp;
+  document.getElementById('btnElbow').textContent = 'Elbow: ' + (state.elbowUp ? 'UP' : 'DOWN');
+}
+
+function resetView() {
+  state.target = { x: 150, y: 80 };
+  state.wpIndex = 0;
+  state.elbowUp = true;
+  document.getElementById('btnElbow').textContent = 'Elbow: UP';
+  if (state.mode === 'auto') setMode('manual');
+  updateWpUI();
+}
+
+// ── UTIL ──────────────────────────────────────────────────────────────
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+buildWpUI();
+
+// initialise angles to home position
+const initSol = solveIK(state.target.x, state.target.y, true);
+if (initSol.reachable) {
+  state.current.theta1 = initSol.theta1;
+  state.current.theta2 = initSol.theta2;
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
