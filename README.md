@@ -419,4 +419,3 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ---
 
-*Built as part of the SIM-Lab Kenya AI Training Program.*
