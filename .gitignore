@@ -1,0 +1,37 @@
+# Arduino build output
+build/
+*.bin
+*.elf
+*.hex
+*.eep
+*.map
+
+# Arduino IDE 2.x cache
+.arduino15/
+cache/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Libraries (commit your own, not installed ones)
+libraries/
