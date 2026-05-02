@@ -6,7 +6,7 @@
 ![Difficulty](https://img.shields.io/badge/Level-Beginner--Intermediate-orange?style=flat-square)
 ![AI Training](https://img.shields.io/badge/AI%20Training-SIM--Lab%20Kenya-purple?style=flat-square)
 
-**AI Training Program Project — SIM-Lab Kenya**
+**AI Training Program Capstone Project — Moringa Schooll**
 
 A hands-on introduction to geometric motion planning: computing joint angles for a 2-DOF robotic arm using Inverse Kinematics, implemented in Arduino C++. Includes an interactive browser-based demonstration.
 
