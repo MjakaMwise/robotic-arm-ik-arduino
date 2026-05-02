@@ -4,7 +4,7 @@
 ![Language](https://img.shields.io/badge/Language-C%2B%2B-blue?style=flat-square&logo=cplusplus)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 ![Difficulty](https://img.shields.io/badge/Level-Beginner--Intermediate-orange?style=flat-square)
-![AI Training](https://img.shields.io/badge/AI%20Training-SIM--Lab%20Kenya-purple?style=flat-square)
+![AI Training](https://img.shields.io/badge/AI%20Training-Moringa%20School-purple?style=flat-square)
 
 **AI Training Program Capstone Project — Moringa Schooll**
 
